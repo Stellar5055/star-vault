@@ -53,3 +53,6 @@ Biggest file stored so far: `IMG_20260828_163356.jpg`, 1,247,338 B → 1,247,370
 ## What this isn't
 
 Not base64 in a `.txt`, not a renamed PNG, not a zip glued onto a JPEG. The SVG is a real image and the data lives in the star colours.
+
+
+--Readme made by AI--

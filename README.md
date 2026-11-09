@@ -2,7 +2,7 @@
 
 Store any file as a night-sky SVG. Every byte of the file becomes one star. The SVG opens in any image viewer.
 
-Live demo: `<TODO: your github pages url>`
+Live demo: https://stellar5055.github.io/star-vault/
 
 ## How it works
 
@@ -42,7 +42,7 @@ Biggest file stored so far: `IMG_20260828_163356.jpg`, 1,247,338 B → 1,247,370
 ## Files
 
 - `index.html` — the whole app. Vanilla JS, zero dependencies.
-- `example.sky.svg` — `<TODO: add one, a carrier with a file already in it>`
+- `example.sky.svg` — a carrier with channels4_profile.jpg already in it, decode it to check
 
 ## Notes
 

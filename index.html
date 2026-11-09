@@ -40,10 +40,6 @@
                 font-size: 15px;
             }
 
-            .logo span {
-                color: #B45309;
-            }
-
             nav a {
                 color: #6B6B6B;
                 text-decoration: none;
@@ -126,6 +122,19 @@
                 display: block;
                 margin-top: 6px;
                 font-size: 12px;
+            }
+
+            textarea {
+                width: 100%;
+                font-family: ui-monospace, Menlo, monospace;
+                font-size: 11px;
+                border: 1px solid #E2E0D8;
+                border-radius: 8px;
+                padding: 10px;
+                background: #F5F3EC;
+                color: #141414;
+                resize: vertical;
+                margin-top: 12px;
             }
 
             .row {
@@ -253,12 +262,6 @@
                 color: #92400E;
             }
 
-            .ok {
-                background: #F0FDF4;
-                border: 1px solid #BBF7D0;
-                color: #15803D;
-            }
-
             .err {
                 background: #FEF2F2;
                 border: 1px solid #FECACA;
@@ -288,15 +291,15 @@
     <body>
         <header>
             <div class="wrap bar">
-                <div class="logo"><span>✦</span> Star Vault</div>
-                <nav><a href="#how">How it works</a><a href="https://github.com">GitHub</a></nav>
+                <div class="logo">Star Vault</div>
+                <nav><a href="https://github.com">GitHub</a></nav>
             </div>
         </header>
 
         <main>
             <div class="wrap">
-                <h1>Store any file as a night sky.</h1>
-                <p class="sub">Drop a file, get a real .svg. Drop it back, get your file.</p>
+                <h1>Store a file as a night sky</h1>
+                <p class="sub">Drop a file to get an SVG. Drop the SVG to get the file back.</p>
 
                 <div class="tabs" role="tablist">
                     <button id="tab-store" aria-selected="true">Store</button>
@@ -343,17 +346,20 @@
                         <small>we pull the file back out</small>
                         <input type="file" id="ret-input" accept=".svg" hidden>
                     </div>
+                    <div class="meta" style="text-align:center;margin:10px 0">or paste it</div>
+                    <textarea id="ret-paste" rows="3" placeholder="Paste sky.svg text here (from Copy SVG)"></textarea>
+                    <div class="actions"><button class="btn" id="ret-paste-go">Decode pasted SVG</button></div>
                     <div id="ret-info" hidden>
                         <div class="fname" id="ret-name">—</div>
                         <div class="meta" id="ret-meta">—</div>
+                        <div class="preview" id="ret-preview" hidden><img id="ret-out-img" alt="Recovered preview"></div>
                         <div class="hash"><code id="ret-hash">—</code><button id="ret-copy">Copy</button></div>
-                        <div class="note ok" id="ret-match" hidden>✓ Matches original from this session.</div>
                         <div class="note err" id="ret-err" hidden></div>
                         <div class="actions"><button class="btn btn-primary" id="ret-dl">Download file</button></div>
                     </div>
                 </section>
 
-                <footer id="how">1 star = 1 byte · header STAR + name + length · SHA-256 verified.</footer>
+                <footer>1 star = 1 byte. Header is STAR + name + length. SHA-256 shown both sides.</footer>
             </div>
         </main>
 
@@ -362,11 +368,11 @@
             const LIM = 20 * 1024;
 
             let storeFile = null, storeBlob = null, storeSvgText = '', storeSvgUrl = '';
-            let lastOriginalSha = '';
             let retData = null, retName = '', retUrl = '';
 
             const fmt = n => n < 1024 ? n + ' B' : (n / 1024).toFixed(1) + ' KB';
             const trunc = s => s.length > 14 ? s.slice(0, 8) + '…' + s.slice(-4) : s;
+            const imgType = n => ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp' }[(n.split('.').pop() || '').toLowerCase()] || '');
 
             async function sha256(bytes) {
                 try {
@@ -421,6 +427,12 @@
                 a.href = url; a.download = filename; a.click();
             }
 
+            function copied(btn) {
+                const old = btn.textContent;
+                btn.textContent = 'Copied';
+                setTimeout(() => { btn.textContent = old; }, 1200);
+            }
+
             function show(which) {
                 const s = which === 'store';
                 $('panel-store').hidden = !s; $('panel-ret').hidden = s;
@@ -443,7 +455,6 @@
                 const bytes = new Uint8Array(await f.arrayBuffer());
                 storeBlob = pack(f.name, bytes);
                 const h = await sha256(bytes);
-                lastOriginalSha = h;
                 $('store-info').hidden = false; $('store-out').hidden = true;
                 $('store-name').textContent = f.name;
                 $('store-meta').textContent = `${fmt(bytes.length)} → ${storeBlob.length} stars → ~${fmt(storeBlob.length * 78 + 200)} svg`;
@@ -457,7 +468,7 @@
                 $('store-img').removeAttribute('src');
                 $('store-info').hidden = true; $('store-out').hidden = true;
             };
-            $('store-copy').onclick = () => navigator.clipboard.writeText($('store-hash-full').textContent);
+            $('store-copy').onclick = e => { navigator.clipboard.writeText($('store-hash-full').textContent); copied(e.target); };
 
             $('store-go').onclick = () => {
                 if (!storeBlob) return;
@@ -469,33 +480,44 @@
                 $('store-out').hidden = false;
             };
             $('store-dl').onclick = () => storeSvgUrl && download(storeSvgUrl, (storeFile?.name || 'file') + '.sky.svg');
-            $('store-copy-svg').onclick = () => navigator.clipboard.writeText(storeSvgText);
+            $('store-copy-svg').onclick = e => { navigator.clipboard.writeText(storeSvgText); copied(e.target); };
 
-            wireDrop($('ret-drop'), $('ret-input'), async f => {
-                $('ret-err').hidden = true; $('ret-dl').style.display = ''; $('ret-match').hidden = true;
+            async function decodeSvgText(text, label) {
+                $('ret-err').hidden = true; $('ret-dl').style.display = '';
+                $('ret-preview').hidden = true;
                 try {
-                    const text = await f.text();
                     const { name, data } = unpack(fromSVG(text));
                     retData = data; retName = name;
                     const h = await sha256(data);
                     if (retUrl) URL.revokeObjectURL(retUrl);
-                    retUrl = URL.createObjectURL(new Blob([data]));
+                    const t = imgType(name);
+                    retUrl = URL.createObjectURL(new Blob([data], { type: t || 'application/octet-stream' }));
                     $('ret-info').hidden = false;
                     $('ret-name').textContent = name;
                     $('ret-meta').textContent = `${fmt(data.length)} · sha ${trunc(h)}`;
                     $('ret-hash').textContent = trunc(h);
-                    $('ret-copy').onclick = () => navigator.clipboard.writeText(h);
-                    $('ret-match').hidden = !(lastOriginalSha && h === lastOriginalSha);
+                    $('ret-copy').onclick = e => { navigator.clipboard.writeText(h); copied(e.target); };
+                    if (t) { $('ret-out-img').src = retUrl; $('ret-preview').hidden = false; }
                 } catch {
-                    retData = null; retName = ''; $('ret-match').hidden = true;
+                    $('ret-preview').hidden = true;
+                    retData = null; retName = '';
+                    $('ret-copy').onclick = () => {};
                     $('ret-info').hidden = false; $('ret-dl').style.display = 'none';
-                    $('ret-name').textContent = f.name;
+                    $('ret-name').textContent = label;
                     $('ret-meta').textContent = 'could not decode';
                     $('ret-hash').textContent = '—';
                     const e = $('ret-err'); e.hidden = false;
                     e.textContent = "This doesn't look like one of ours — no STAR header found.";
                 }
+            }
+            wireDrop($('ret-drop'), $('ret-input'), async f => {
+                $('ret-input').value = '';
+                decodeSvgText(await f.text(), f.name);
             });
+            $('ret-paste-go').onclick = () => {
+                const text = $('ret-paste').value;
+                if (text.trim()) decodeSvgText(text, 'pasted.svg');
+            };
             $('ret-dl').onclick = () => retUrl && download(retUrl, retName);
         </script>
     </body>

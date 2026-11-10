@@ -353,6 +353,10 @@
                         <div class="fname" id="ret-name">—</div>
                         <div class="meta" id="ret-meta">—</div>
                         <div class="preview" id="ret-preview" hidden><img id="ret-out-img" alt="Recovered preview"></div>
+                        <div id="ret-sky-wrap" hidden>
+                            <div class="preview"><img id="ret-sky-img" alt="Dropped sky preview"></div>
+                            <div class="meta" id="ret-sky-meta" style="margin-top:8px">—</div>
+                        </div>
                         <div class="hash"><code id="ret-hash">—</code><button id="ret-copy">Copy</button></div>
                         <div class="note err" id="ret-err" hidden></div>
                         <div class="actions"><button class="btn btn-primary" id="ret-dl">Download file</button></div>
@@ -368,7 +372,7 @@
             const LIM = 20 * 1024;
 
             let storeFile = null, storeBlob = null, storeSvgText = '', storeSvgUrl = '';
-            let retData = null, retName = '', retUrl = '';
+            let retData = null, retName = '', retUrl = '', retSkyUrl = '';
 
             const fmt = n => n < 1024 ? n + ' B' : (n / 1024).toFixed(1) + ' KB';
             const trunc = s => s.length > 14 ? s.slice(0, 8) + '…' + s.slice(-4) : s;
@@ -415,13 +419,22 @@
 
             function toSVG(blob) {
                 seed = 0xC0FFEE;
-                let s = '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><rect width="800" height="600" fill="#0a0e2a"/>';
-                for (let i = 0; i < blob.length; i++) {
-                    const cx = rnd(800), cy = rnd(600);
-                    const r = (1 + (i % 3) * 0.5).toFixed(1);
-                    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="rgb(255,255,${blob[i]})"/>`;
+                // grow the sky with the file so density (and the look) stays constant;
+                // small files stay exactly 800x600
+                let W = 800, H = 600;
+                const need = Math.ceil(blob.length / 6708 * 480000);
+                if (need > 480000) {
+                    W = Math.ceil(Math.sqrt(need * 4 / 3));
+                    H = Math.ceil(W * 3 / 4);
                 }
-                return s + '</svg>';
+                const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#0a0e2a"/>`];
+                for (let i = 0; i < blob.length; i++) {
+                    const cx = rnd(W), cy = rnd(H);
+                    const r = (1 + (i % 3) * 0.5).toFixed(1);
+                    parts.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="rgb(255,255,${blob[i]})"/>`);
+                }
+                parts.push('</svg>');
+                return parts.join('');
             }
 
             function fromSVG(text) {
@@ -433,7 +446,9 @@
 
             function download(url, filename) {
                 const a = document.createElement('a');
-                a.href = url; a.download = filename; a.click();
+                a.href = url; a.download = filename;
+                document.body.appendChild(a); a.click();
+                setTimeout(() => a.remove(), 4000);
             }
 
             function copied(btn) {
@@ -494,6 +509,11 @@
             async function decodeSvgText(text, label) {
                 $('ret-err').hidden = true; $('ret-dl').style.display = '';
                 $('ret-preview').hidden = true;
+                if (retSkyUrl) URL.revokeObjectURL(retSkyUrl);
+                retSkyUrl = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' }));
+                $('ret-sky-img').src = retSkyUrl;
+                $('ret-sky-meta').textContent = label + ' - ' + fmt(text.length);
+                $('ret-sky-wrap').hidden = false;
                 try {
                     const { name, data } = unpack(fromSVG(text));
                     retData = data; retName = name;
@@ -506,7 +526,7 @@
                     $('ret-meta').textContent = `${fmt(data.length)} · sha ${trunc(h)}`;
                     $('ret-hash').textContent = trunc(h);
                     $('ret-copy').onclick = e => { navigator.clipboard.writeText(h); copied(e.target); };
-                    if (t) { $('ret-out-img').src = retUrl; $('ret-preview').hidden = false; }
+                    if (t) { $('ret-out-img').src = retUrl; $('ret-preview').hidden = false; $('ret-sky-wrap').hidden = true; }
                 } catch {
                     $('ret-preview').hidden = true;
                     retData = null; retName = '';

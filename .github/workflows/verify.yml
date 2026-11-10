@@ -9,3 +9,4 @@ jobs:
         with:
           node-version: 20
       - run: node test/roundtrip.cjs
+      - run: node test/wiring.cjs

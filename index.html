@@ -511,10 +511,16 @@
                 storeSvgUrl = URL.createObjectURL(new Blob([storeSvgText], { type: 'image/svg+xml' }));
                 $('store-dl').href = storeSvgUrl;
                 $('store-dl').download = (storeFile?.name || 'file') + '.sky.svg';
-                $('store-img').src = storeSvgUrl;
                 $('store-svgmeta').textContent = `${storeBlob.length} stars · ${fmt(storeSvgText.length)} svg · opens in any image viewer`;
                 $('store-out').hidden = false;
                 btn.disabled = false; btn.textContent = 'Make night sky';
+                await new Promise(r => setTimeout(r, 0));
+                if (storeSvgText.length < 3000000) {
+                    $('store-img').src = storeSvgUrl;
+                } else {
+                    $('store-img').removeAttribute('src');
+                    $('store-svgmeta').textContent += ' · preview skipped, sky too big (download works fine)';
+                }
             };
             $('store-copy-svg').onclick = e => { navigator.clipboard.writeText(storeSvgText); copied(e.target); };
 

@@ -445,6 +445,7 @@
             }
 
             function download(url, filename) {
+                console.log('[vault] download', filename, url && url.slice(0, 40));
                 const a = document.createElement('a');
                 a.href = url; a.download = filename;
                 document.body.appendChild(a); a.click();
@@ -521,6 +522,7 @@
                     if (retUrl) URL.revokeObjectURL(retUrl);
                     const t = imgType(name);
                     retUrl = URL.createObjectURL(new Blob([data], { type: t || 'application/octet-stream' }));
+                    console.log('[vault] decoded', name, data.length + 'B');
                     $('ret-info').hidden = false;
                     $('ret-name').textContent = name;
                     $('ret-meta').textContent = `${fmt(data.length)} · sha ${trunc(h)}`;

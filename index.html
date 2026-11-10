@@ -515,7 +515,7 @@
                 $('store-out').hidden = false;
                 btn.disabled = false; btn.textContent = 'Make night sky';
                 await new Promise(r => setTimeout(r, 0));
-                if (storeBlob.length < 100000000) {
+                if (storeBlob.length < 250000) {
                     $('store-img').src = storeSvgUrl;
                 } else {
                     $('store-img').removeAttribute('src');
